@@ -1,0 +1,29 @@
+# Docker Compose for production deployment on GCP server
+# Integrates with existing memgraph-platform stack
+
+services:
+  geargraph-api:
+    image: geargraph-api:latest
+    build: .
+    container_name: geargraph-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - MEMGRAPH_HOST=memgraph
+      - MEMGRAPH_PORT=7687
+      - MEMGRAPH_USER=${MEMGRAPH_USER:-}
+      - MEMGRAPH_PASSWORD=${MEMGRAPH_PASSWORD:-}
+      - API_KEY=${API_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://gearshack.app,https://app.gearshack.app}
+    networks:
+      - memgraph-platform_memgraph-net
+    depends_on:
+      - memgraph
+
+networks:
+  memgraph-platform_memgraph-net:
+    external: true
+
+# Note: On production, this should be deployed alongside the existing
+# memgraph-platform stack, or integrated into it directly.

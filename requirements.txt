@@ -1,0 +1,15 @@
+# FastAPI + Strawberry GraphQL
+fastapi==0.115.6
+strawberry-graphql[fastapi]==0.252.0
+uvicorn[standard]==0.34.0
+
+# Memgraph/Neo4j Driver
+neo4j==5.27.0
+
+# Environment & Utils
+python-dotenv==1.0.1
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# Optional: CORS
+python-multipart==0.0.19
