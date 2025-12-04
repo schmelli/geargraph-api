@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from strawberry.fastapi import GraphQLRouter
@@ -13,9 +13,7 @@ from app.auth.api_key import verify_api_key
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    # Startup: connection pool is created lazily
     yield
-    # Shutdown: close database connections
     close_db()
 
 
@@ -80,28 +78,26 @@ async def stats():
         )
 
 
-# GraphQL endpoint with API key protection
-graphql_app = GraphQLRouter(
-    schema,
-    path="/graphql",
-)
-
-
-# Custom GraphQL route with auth
-@app.api_route("/graphql", methods=["GET", "POST", "OPTIONS"])
-async def graphql_with_auth(request: Request):
-    """GraphQL endpoint with API key authentication."""
-    # Skip auth for OPTIONS (CORS preflight)
-    if request.method == "OPTIONS":
-        return await graphql_app.handle_request(request)
-    
-    # Skip auth for GraphQL Playground (GET requests in browser)
+# Custom context for API key validation
+async def get_context(request: Request) -> dict:
+    """Context getter that validates API key for mutations/queries."""
+    # Skip auth for GraphQL Playground (GET requests)
     if request.method == "GET":
-        return await graphql_app.handle_request(request)
+        return {"authenticated": True}
     
-    # Verify API key for actual queries (POST)
+    # Validate API key for POST requests
     api_key = request.headers.get("X-API-Key")
     if not verify_api_key(api_key):
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
     
-    return await graphql_app.handle_request(request)
+    return {"authenticated": True}
+
+
+# GraphQL endpoint with context-based auth
+graphql_app = GraphQLRouter(
+    schema,
+    context_getter=get_context,
+)
+
+# Mount GraphQL router
+app.include_router(graphql_app, prefix="/graphql")
