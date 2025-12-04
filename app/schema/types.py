@@ -1,16 +1,5 @@
 import strawberry
 from typing import Optional
-from app.schema.resolvers import (
-    resolve_all_brands,
-    resolve_all_categories,
-    resolve_all_gear,
-    resolve_gear,
-    resolve_brand,
-    resolve_autocomplete_gear,
-    resolve_autocomplete_brands,
-    resolve_find_alternatives,
-    resolve_stats,
-)
 
 
 # === Scalar Types ===
@@ -124,11 +113,13 @@ class Query:
     @strawberry.field
     def all_brands(self) -> list[Brand]:
         """Get all outdoor brands."""
+        from app.schema.resolvers import resolve_all_brands
         return resolve_all_brands()
     
     @strawberry.field
     def all_categories(self) -> list[Category]:
         """Get the full category hierarchy."""
+        from app.schema.resolvers import resolve_all_categories
         return resolve_all_categories()
     
     @strawberry.field
@@ -139,6 +130,7 @@ class Query:
         offset: int = 0
     ) -> list[GearItem]:
         """Get gear items with optional filtering and pagination."""
+        from app.schema.resolvers import resolve_all_gear
         return resolve_all_gear(filter, limit, offset)
     
     @strawberry.field
@@ -148,11 +140,13 @@ class Query:
         name: Optional[str] = None
     ) -> Optional[GearItem]:
         """Get a single gear item by ID or name."""
+        from app.schema.resolvers import resolve_gear
         return resolve_gear(gear_id, name)
     
     @strawberry.field
     def brand(self, name: str) -> Optional[Brand]:
         """Get a single brand by name."""
+        from app.schema.resolvers import resolve_brand
         return resolve_brand(name)
     
     @strawberry.field
@@ -162,6 +156,7 @@ class Query:
         limit: int = 10
     ) -> list[GearItem]:
         """Autocomplete search for gear items."""
+        from app.schema.resolvers import resolve_autocomplete_gear
         return resolve_autocomplete_gear(query, limit)
     
     @strawberry.field
@@ -171,6 +166,7 @@ class Query:
         limit: int = 10
     ) -> list[Brand]:
         """Autocomplete search for brands."""
+        from app.schema.resolvers import resolve_autocomplete_brands
         return resolve_autocomplete_brands(query, limit)
     
     @strawberry.field
@@ -181,9 +177,11 @@ class Query:
         limit: int = 10
     ) -> list[GearItem]:
         """Find alternative gear items based on product type and filters."""
+        from app.schema.resolvers import resolve_find_alternatives
         return resolve_find_alternatives(gear_id, filter, limit)
     
     @strawberry.field
     def stats(self) -> Stats:
         """Get database statistics."""
+        from app.schema.resolvers import resolve_stats
         return resolve_stats()

@@ -1,12 +1,15 @@
 """GraphQL Resolvers - Database queries for each field."""
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from app.db.memgraph import get_db
-from app.schema import types as t
+
+if TYPE_CHECKING:
+    from app.schema import types as t
 
 
-def resolve_all_brands() -> list[t.Brand]:
+def resolve_all_brands():
     """Fetch all brands from the database."""
+    from app.schema.types import Brand
     db = get_db()
     results = db.execute_query("""
         MATCH (b:OutdoorBrand)
@@ -19,8 +22,8 @@ def resolve_all_brands() -> list[t.Brand]:
         ORDER BY b.name
     """)
     return [
-        t.Brand(
-            id=row["name"],  # Using name as ID for now
+        Brand(
+            id=row["name"],
             name=row["name"],
             country=row.get("country"),
             website=row.get("website"),
@@ -32,11 +35,11 @@ def resolve_all_brands() -> list[t.Brand]:
     ]
 
 
-def resolve_all_categories() -> list[t.Category]:
+def resolve_all_categories():
     """Fetch category hierarchy from the database."""
+    from app.schema.types import Category, Subcategory, ProductType
     db = get_db()
     
-    # Get categories with their product families
     results = db.execute_query("""
         MATCH (c:Category)
         OPTIONAL MATCH (pf:ProductFamily)-[:IN_CATEGORY]->(c)
@@ -45,20 +48,18 @@ def resolve_all_categories() -> list[t.Category]:
         ORDER BY c.name
     """)
     
-    # For now, we return a flat structure
-    # TODO: Implement proper 3-level hierarchy when data supports it
     categories = []
     for row in results:
         product_types = [
-            t.ProductType(name=pt) 
+            ProductType(name=pt) 
             for pt in row.get("product_types", []) 
             if pt is not None
         ]
-        categories.append(t.Category(
+        categories.append(Category(
             name=row["category"],
             subcategories=[
-                t.Subcategory(
-                    name="All",  # Placeholder
+                Subcategory(
+                    name="All",
                     product_types=product_types
                 )
             ] if product_types else []
@@ -67,15 +68,11 @@ def resolve_all_categories() -> list[t.Category]:
     return categories
 
 
-def resolve_all_gear(
-    filter: Optional[t.GearFilter], 
-    limit: int, 
-    offset: int
-) -> list[t.GearItem]:
+def resolve_all_gear(filter, limit: int, offset: int):
     """Fetch gear items with optional filtering."""
+    from app.schema.types import GearItem
     db = get_db()
     
-    # Build dynamic query based on filters
     where_clauses = []
     params = {"limit": limit, "offset": offset}
     
@@ -120,11 +117,9 @@ def resolve_all_gear(
     return [_map_gear_item(row["g"]) for row in results]
 
 
-def resolve_gear(
-    gear_id: Optional[str], 
-    name: Optional[str]
-) -> Optional[t.GearItem]:
+def resolve_gear(gear_id: Optional[str], name: Optional[str]):
     """Fetch a single gear item by ID or name."""
+    from app.schema.types import Insight
     db = get_db()
     
     if gear_id:
@@ -145,7 +140,6 @@ def resolve_gear(
     
     gear = _map_gear_item(result["g"])
     
-    # Fetch insights for this gear item
     insights_result = db.execute_query("""
         MATCH (g:GearItem {gearId: $id})-[:HAS_TIP]->(i:Insight)
         RETURN i.summary as summary, 
@@ -155,7 +149,7 @@ def resolve_gear(
     """, {"id": gear.gear_id})
     
     gear.insights = [
-        t.Insight(
+        Insight(
             summary=row["summary"],
             content=row["content"],
             category=row.get("category"),
@@ -167,8 +161,9 @@ def resolve_gear(
     return gear
 
 
-def resolve_brand(name: str) -> Optional[t.Brand]:
+def resolve_brand(name: str):
     """Fetch a single brand by name."""
+    from app.schema.types import Brand
     db = get_db()
     result = db.execute_single("""
         MATCH (b:OutdoorBrand {name: $name})
@@ -183,7 +178,7 @@ def resolve_brand(name: str) -> Optional[t.Brand]:
     if not result:
         return None
     
-    return t.Brand(
+    return Brand(
         id=result["name"],
         name=result["name"],
         country=result.get("country"),
@@ -194,7 +189,7 @@ def resolve_brand(name: str) -> Optional[t.Brand]:
     )
 
 
-def resolve_autocomplete_gear(query: str, limit: int) -> list[t.GearItem]:
+def resolve_autocomplete_gear(query: str, limit: int):
     """Search gear items by name prefix (case-insensitive)."""
     db = get_db()
     results = db.execute_query("""
@@ -210,8 +205,9 @@ def resolve_autocomplete_gear(query: str, limit: int) -> list[t.GearItem]:
     return [_map_gear_item(row["g"]) for row in results]
 
 
-def resolve_autocomplete_brands(query: str, limit: int) -> list[t.Brand]:
+def resolve_autocomplete_brands(query: str, limit: int):
     """Search brands by name prefix (case-insensitive)."""
+    from app.schema.types import Brand
     db = get_db()
     results = db.execute_query("""
         MATCH (b:OutdoorBrand)
@@ -226,7 +222,7 @@ def resolve_autocomplete_brands(query: str, limit: int) -> list[t.Brand]:
     """, {"query": query, "limit": limit})
     
     return [
-        t.Brand(
+        Brand(
             id=row["name"],
             name=row["name"],
             country=row.get("country"),
@@ -236,15 +232,10 @@ def resolve_autocomplete_brands(query: str, limit: int) -> list[t.Brand]:
     ]
 
 
-def resolve_find_alternatives(
-    gear_id: str,
-    filter: Optional[t.AlternativeFilter],
-    limit: int
-) -> list[t.GearItem]:
+def resolve_find_alternatives(gear_id: str, filter, limit: int):
     """Find alternative gear items based on same product type and optional filters."""
     db = get_db()
     
-    # First get the reference gear's product type
     ref = db.execute_single("""
         MATCH (g:GearItem {gearId: $id})
         RETURN g.productType as product_type, g.category as category
@@ -253,7 +244,6 @@ def resolve_find_alternatives(
     if not ref or not ref.get("product_type"):
         return []
     
-    # Build filter conditions
     where_clauses = ["g.gearId <> $id"]
     params = {
         "id": gear_id, 
@@ -285,8 +275,9 @@ def resolve_find_alternatives(
     return [_map_gear_item(row["g"]) for row in results]
 
 
-def resolve_stats() -> t.Stats:
+def resolve_stats():
     """Get database statistics."""
+    from app.schema.types import Stats
     db = get_db()
     result = db.execute_single("""
         MATCH (g:GearItem) WITH count(g) as gear
@@ -295,7 +286,7 @@ def resolve_stats() -> t.Stats:
         RETURN gear, brands, insights
     """)
     
-    return t.Stats(
+    return Stats(
         gear_count=result["gear"] if result else 0,
         brand_count=result["brands"] if result else 0,
         insight_count=result["insights"] if result else 0,
@@ -304,9 +295,10 @@ def resolve_stats() -> t.Stats:
 
 # === Helper Functions ===
 
-def _map_gear_item(node: dict) -> t.GearItem:
+def _map_gear_item(node: dict):
     """Map a Memgraph node to a GearItem type."""
-    return t.GearItem(
+    from app.schema.types import GearItem
+    return GearItem(
         gear_id=node.get("gearId", node.get("name", "")),
         name=node.get("name", ""),
         brand_name=node.get("brand", node.get("brandName", "")),
@@ -338,7 +330,6 @@ def _parse_int(value) -> Optional[int]:
         return value
     if isinstance(value, str):
         try:
-            # Handle strings like "500 lumens"
             return int(''.join(filter(str.isdigit, value)))
         except ValueError:
             return None
