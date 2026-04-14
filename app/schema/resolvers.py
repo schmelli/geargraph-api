@@ -318,7 +318,7 @@ def _map_gear_item(node: dict):
         materials=node.get("materials"),
         features=node.get("features"),
         product_url=node.get("productUrl"),
-        image_url=node.get("imageUrl"),
+        image_url=node.get("image_url", node.get("imageUrl")),
     )
 
 
